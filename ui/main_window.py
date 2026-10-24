@@ -1,3 +1,4 @@
+from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -6,13 +7,19 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QInputDialog,
-    QListWidget
+    QListWidget,
+    QFileDialog
 )
+
 
 # класс основного окна
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+
+        # путь к текущему рабочему пространству
+        # None означает, что пользователь пока не выбрал папку
+        self.workspace_path = None
 
         self._setup_window()
         self._setup_main_layout()
@@ -33,7 +40,7 @@ class MainWindow(QMainWindow):
         self.main_layout = QHBoxLayout()
         self.central_widget.setLayout(self.main_layout)
 
-        # widget'ы для двух панелей(левой и правой) внутри main_layout
+        # widget'ы для двух панелей (левой и правой) внутри main_layout
         self.left_panel = QWidget()
         self.right_panel = QWidget()
 
@@ -48,6 +55,15 @@ class MainWindow(QMainWindow):
         self.sidebar_layout = QVBoxLayout()
         self.left_panel.setLayout(self.sidebar_layout)
 
+        # отображение текущего рабочего пространства
+        self.workspace_path_label = QLabel("Пространство не выбрано")
+        self.sidebar_layout.addWidget(self.workspace_path_label)
+
+        # кнопка выбора рабочего пространства
+        self.open_workspace_button = QPushButton("Открыть пространство")
+        self.open_workspace_button.clicked.connect(self._open_workspace)
+        self.sidebar_layout.addWidget(self.open_workspace_button)
+
         self.sidebar_title = QLabel("Предметы")
         self.sidebar_layout.addWidget(self.sidebar_title)
 
@@ -58,12 +74,37 @@ class MainWindow(QMainWindow):
         self.add_subject_button.clicked.connect(self._add_subject)
         self.sidebar_layout.addWidget(self.add_subject_button)
 
+    # выбор рабочего пространства
+    def _open_workspace(self):
+        path = QFileDialog.getExistingDirectory(
+            self,
+            "Выберите учебное пространство",
+            ""
+        )
+
+        if path:
+            self.workspace_path = Path(path)
+            self.workspace_path_label.setText(path)
+            self._load_subjects()
+
     # добавление нового предмета
     def _add_subject(self):
-        name, ok = QInputDialog.getText(self, "Добавление предмета", "Название предмета:")
+        name, ok = QInputDialog.getText(
+            self,
+            "Добавление предмета",
+            "Название предмета:"
+        )
+
         name = name.strip()
 
         if ok and name:
             self.subject_list.addItem(name)
         else:
-            print(f":( ok = {ok}, name = \"{name}\"")
+            print(f':( ok = {ok}, name = "{name}"')
+
+    # загрузка предметов из папок рабочего пространства
+    def _load_subjects(self):
+        self.subject_list.clear()
+        for item in self.workspace_path.iterdir():
+            if item.is_dir() and not item.name.startswith("."):
+                self.subject_list.addItem(item.name)
