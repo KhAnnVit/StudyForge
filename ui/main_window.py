@@ -6,9 +6,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QLabel,
     QPushButton,
-    QInputDialog,
-    QListWidget,
-    QFileDialog
+    QFileDialog,
+    QTreeView,
+    QFileSystemModel
 )
 
 
@@ -67,12 +67,18 @@ class MainWindow(QMainWindow):
         self.sidebar_title = QLabel("Предметы")
         self.sidebar_layout.addWidget(self.sidebar_title)
 
-        self.subject_list = QListWidget()
-        self.sidebar_layout.addWidget(self.subject_list)
 
-        self.add_subject_button = QPushButton("Добавить предмет")
-        self.add_subject_button.clicked.connect(self._add_subject)
-        self.sidebar_layout.addWidget(self.add_subject_button)
+        self.file_system_model = QFileSystemModel()
+        self.file_tree = QTreeView()
+        self.file_tree.setModel(self.file_system_model)
+        self.file_tree.hideColumn(1)
+        self.file_tree.hideColumn(2)
+        self.file_tree.hideColumn(3)
+
+        self.file_tree.setHeaderHidden(True)
+
+        self.sidebar_layout.addWidget(self.file_tree)
+
 
     # выбор рабочего пространства
     def _open_workspace(self):
@@ -85,26 +91,9 @@ class MainWindow(QMainWindow):
         if path:
             self.workspace_path = Path(path)
             self.workspace_path_label.setText(path)
-            self._load_subjects()
 
-    # добавление нового предмета
-    def _add_subject(self):
-        name, ok = QInputDialog.getText(
-            self,
-            "Добавление предмета",
-            "Название предмета:"
-        )
+            self.file_system_model.setRootPath(path)
 
-        name = name.strip()
+            root_index = self.file_system_model.index(path)
+            self.file_tree.setRootIndex(root_index)
 
-        if ok and name:
-            self.subject_list.addItem(name)
-        else:
-            print(f':( ok = {ok}, name = "{name}"')
-
-    # загрузка предметов из папок рабочего пространства
-    def _load_subjects(self):
-        self.subject_list.clear()
-        for item in self.workspace_path.iterdir():
-            if item.is_dir() and not item.name.startswith("."):
-                self.subject_list.addItem(item.name)
