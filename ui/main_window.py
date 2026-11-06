@@ -112,6 +112,7 @@ class MainWindow(QMainWindow):
 
 
 
+
     # выбор рабочего пространства
     def _open_workspace(self):
         path = QFileDialog.getExistingDirectory(
@@ -159,8 +160,10 @@ class MainWindow(QMainWindow):
             text_view.setPlainText(file_path.read_text(encoding="utf-8"))
             self.right_panel_tab_widget.setCurrentWidget(file_view_page)
             self.right_panel_tab_widget.setStyleSheet("background-color: white")
-            self.opened_files[file_path] = {"page": file_view_page, "editor": text_view
-}
+            self.opened_files[file_path] = {"page": file_view_page, "editor": text_view, "modified": False}
+
+            text_view.textChanged.connect(self._mark_file_modified)
+
 
         elif self.opened_files.get(file_path) is not None:
             self.right_panel_tab_widget.setCurrentWidget(self.opened_files[file_path]["page"])
@@ -184,6 +187,7 @@ class MainWindow(QMainWindow):
 
     def _save_current_file(self):
         active_widget = self.right_panel_tab_widget.currentWidget()
+        active_index = self.right_panel_tab_widget.indexOf(active_widget)
         path = None
         for key, value in self.opened_files.items():
             if value["page"] is active_widget:
@@ -193,8 +197,23 @@ class MainWindow(QMainWindow):
         if path is not None:
             editor = self.opened_files[path]["editor"]
             path.write_text(editor.toPlainText(), encoding="utf-8")
+            self.opened_files[path]["modified"] = False
+            self.right_panel_tab_widget.setTabText(active_index, path.stem)
 
 
+    def _mark_file_modified(self):
+        current_widget = self.right_panel_tab_widget.currentWidget()
+        current_index = self.right_panel_tab_widget.indexOf(current_widget)
+
+        path = None
+
+        for key, value in self.opened_files.items():
+            if value["page"] is current_widget:
+                path = key
+
+        if path is not None:
+            self.right_panel_tab_widget.setTabText(current_index, f"{path.stem} *")
+            self.opened_files[path]["modified"] = True
 
 
 
