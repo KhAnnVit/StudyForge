@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -12,6 +13,12 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QTabWidget
 )
+
+from PySide6.QtGui import (
+    QShortcut,
+    QKeySequence
+)
+
 
 
 # класс основного окна
@@ -32,6 +39,9 @@ class MainWindow(QMainWindow):
         self._setup_main_layout()
         self._setup_sidebar()
         self._setup_right_panel()
+
+        self.save_shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
+        self.save_shortcut.activated.connect(self._save_current_file)
 
     # настройки основного окна
     def _setup_window(self):
@@ -130,8 +140,7 @@ class MainWindow(QMainWindow):
         if not file_path.is_file():
             return
 
-        # записываем имя и расширение
-        file_name = file_path.name
+        # записываем расширение
         suffix = file_path.suffix.lower()
 
         # Просмотр файла
@@ -145,15 +154,16 @@ class MainWindow(QMainWindow):
 
             text_view = QPlainTextEdit()
             file_view_layout.addWidget(text_view)
-            text_view.setReadOnly(True)
+            text_view.setReadOnly(False)
 
             text_view.setPlainText(file_path.read_text(encoding="utf-8"))
             self.right_panel_tab_widget.setCurrentWidget(file_view_page)
             self.right_panel_tab_widget.setStyleSheet("background-color: white")
-            self.opened_files[file_path] = file_view_page
+            self.opened_files[file_path] = {"page": file_view_page, "editor": text_view
+}
 
         elif self.opened_files.get(file_path) is not None:
-            self.right_panel_tab_widget.setCurrentWidget(self.opened_files[file_path])
+            self.right_panel_tab_widget.setCurrentWidget(self.opened_files[file_path]["page"])
 
         else:
             return
@@ -163,13 +173,28 @@ class MainWindow(QMainWindow):
         widget_to_close = self.right_panel_tab_widget.widget(index)
         path = None
         for key, value in self.opened_files.items():
-            if value is widget_to_close:
+            if value["page"] is widget_to_close:
                 path = key
 
-        if path:
+        if path is not None:
           self.opened_files.pop(path)
 
         self.right_panel_tab_widget.removeTab(index)
+
+
+    def _save_current_file(self):
+        active_widget = self.right_panel_tab_widget.currentWidget()
+        path = None
+        for key, value in self.opened_files.items():
+            if value["page"] is active_widget:
+                path = key
+
+
+        if path is not None:
+            editor = self.opened_files[path]["editor"]
+            path.write_text(editor.toPlainText(), encoding="utf-8")
+
+
 
 
 
