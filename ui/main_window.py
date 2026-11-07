@@ -182,7 +182,7 @@ class MainWindow(QMainWindow):
 
         if path is not None:
             if self.opened_files[path]["modified"]:
-                result = self._close_edited_file()
+                result = self._close_edited_file(path)
                 if result == "Save":
                     self._save_file(path)
                     self.opened_files.pop(path)
@@ -238,11 +238,11 @@ class MainWindow(QMainWindow):
 
 
 
-    def _close_edited_file(self):
+    def _close_edited_file(self, path):
         # 1. Создаем объект диалога
         close_message = QMessageBox(self)
         close_message.setWindowTitle("Закрыть вкладку")
-        close_message.setText("Сохранить изменения?")
+        close_message.setText(f"Сохранить изменения «{path.name}»?")
 
         # 2. Добавляем кнопки с кастомным текстом
         # Роль кнопки (ButtonRole) помогает Qt правильно расположить их по стандартам ОС
@@ -263,4 +263,18 @@ class MainWindow(QMainWindow):
             return "Discard"
         if close_message.clickedButton() == cancel_button:
             return "Cancel"
+
+    def closeEvent(self, event):
+        for key, value in self.opened_files.items():
+            if value["modified"]:
+                result = self._close_edited_file(key)
+                if result == "Save":
+                    self._save_file(key)
+                elif result == "Discard":
+                    pass
+                else:
+                    event.ignore()
+                    return
+
+        event.accept()
 
