@@ -12,7 +12,9 @@ from PySide6.QtWidgets import (
     QFileSystemModel,
     QPlainTextEdit,
     QTabWidget,
-    QMessageBox
+    QMessageBox,
+    QStackedWidget,
+    QTextBrowser
 )
 
 from PySide6.QtGui import (
@@ -154,17 +156,41 @@ class MainWindow(QMainWindow):
             file_view_layout = QVBoxLayout()
             file_view_page.setLayout(file_view_layout)
 
-            text_view = QPlainTextEdit()
-            file_view_layout.addWidget(text_view)
-            text_view.setReadOnly(False)
+            mode_change = QWidget()
+            mode_change_layout = QHBoxLayout()
+            mode_change.setLayout(mode_change_layout)
 
-            text_view.setPlainText(file_path.read_text(encoding="utf-8"))
+            edit_button = QPushButton("Режим редактирования")
+            view_button = QPushButton("Режим просмотра")
+
+            mode_change_layout.addWidget(edit_button)
+            mode_change_layout.addWidget(view_button)
+
+            text = QStackedWidget()
+
+            text_edit_mode = QPlainTextEdit()
+            text_edit_mode.setReadOnly(False)
+            text_edit_mode.setPlainText(file_path.read_text(encoding="utf-8"))
+
+            text_view_mode = QTextBrowser()
+            text_view_mode.setMarkdown(text_edit_mode.toPlainText())
+
+            text.addWidget(text_view_mode)
+            text.addWidget(text_edit_mode)
+            text.setCurrentWidget(text_edit_mode)
+
+
             self.right_panel_tab_widget.setCurrentWidget(file_view_page)
             self.right_panel_tab_widget.setStyleSheet("background-color: white")
-            self.opened_files[file_path] = {"page": file_view_page, "editor": text_view, "modified": False}
+            self.opened_files[file_path] = {"page": file_view_page, "editor": text_edit_mode, "modified": False}
 
-            text_view.textChanged.connect(self._mark_file_modified)
+            text_edit_mode.textChanged.connect(self._mark_file_modified)
 
+            file_view_layout.addWidget(mode_change, 1)
+            file_view_layout.addWidget(text, 24)
+
+            edit_button.clicked.connect(lambda: text.setCurrentWidget(text_edit_mode))
+            view_button.clicked.connect(lambda: self._show_markdown_preview(text_edit_mode, text_view_mode, text))
 
         elif self.opened_files.get(file_path) is not None:
             self.right_panel_tab_widget.setCurrentWidget(self.opened_files[file_path]["page"])
@@ -277,4 +303,8 @@ class MainWindow(QMainWindow):
                     return
 
         event.accept()
+
+    def _show_markdown_preview(self, editor, viewer, text_widget):
+        viewer.setMarkdown(editor.toPlainText())
+        text_widget.setCurrentWidget(viewer)
 
