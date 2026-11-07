@@ -14,13 +14,16 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QMessageBox,
     QStackedWidget,
-    QTextBrowser
+    QTextBrowser,
 )
 
 from PySide6.QtGui import (
     QShortcut,
     QKeySequence
 )
+
+from PySide6.QtPdf import QPdfDocument
+from PySide6.QtPdfWidgets import QPdfView
 
 
 
@@ -149,49 +152,13 @@ class MainWindow(QMainWindow):
 
         # Просмотр файла
         if suffix == ".md" and self.opened_files.get(file_path) is None:
-            # просмотр текста
-            file_view_page = QWidget()
-            self.right_panel_tab_widget.addTab(file_view_page, file_path.stem)
-
-            file_view_layout = QVBoxLayout()
-            file_view_page.setLayout(file_view_layout)
-
-            mode_change = QWidget()
-            mode_change_layout = QHBoxLayout()
-            mode_change.setLayout(mode_change_layout)
-
-            edit_button = QPushButton("Режим редактирования")
-            view_button = QPushButton("Режим просмотра")
-
-            mode_change_layout.addWidget(edit_button)
-            mode_change_layout.addWidget(view_button)
-
-            text = QStackedWidget()
-
-            text_edit_mode = QPlainTextEdit()
-            text_edit_mode.setReadOnly(False)
-            text_edit_mode.setPlainText(file_path.read_text(encoding="utf-8"))
-
-            text_view_mode = QTextBrowser()
-            text_view_mode.setMarkdown(text_edit_mode.toPlainText())
-
-            text.addWidget(text_view_mode)
-            text.addWidget(text_edit_mode)
-            text.setCurrentWidget(text_edit_mode)
-
-
-            self.right_panel_tab_widget.setCurrentWidget(file_view_page)
-            self.right_panel_tab_widget.setStyleSheet("background-color: white")
-            self.opened_files[file_path] = {"page": file_view_page, "editor": text_edit_mode, "modified": False}
-
-            text_edit_mode.textChanged.connect(self._mark_file_modified)
-
-            file_view_layout.addWidget(mode_change, 1)
-            file_view_layout.addWidget(text, 24)
-
-            edit_button.clicked.connect(lambda: text.setCurrentWidget(text_edit_mode))
-            view_button.clicked.connect(lambda: self._show_markdown_preview(text_edit_mode, text_view_mode, text))
-
+            self._set_markdown_mode(file_path)
+        elif suffix == ".pdf" and self.opened_files.get(file_path) is None:
+            self._set_pdf_mode(file_path)
+        # elif suffix == ".docx" and self.opened_files.get(file_path) is None:
+        #     self._set_docx_mode(file_path)
+        # elif suffix == ".odt" and self.opened_files.get(file_path) is None:
+        #     self._set_odt_mode(file_path)
         elif self.opened_files.get(file_path) is not None:
             self.right_panel_tab_widget.setCurrentWidget(self.opened_files[file_path]["page"])
 
@@ -232,7 +199,7 @@ class MainWindow(QMainWindow):
                 path = key
 
 
-        if path is not None:
+        if path is not None and self.opened_files[path]["editor"]:
             editor = self.opened_files[path]["editor"]
             path.write_text(editor.toPlainText(), encoding="utf-8")
             self.opened_files[path]["modified"] = False
@@ -304,7 +271,131 @@ class MainWindow(QMainWindow):
 
         event.accept()
 
+    def _set_markdown_mode(self, file_path):
+        # просмотр текста
+        file_view_page = QWidget()
+        self.right_panel_tab_widget.addTab(file_view_page, file_path.stem)
+
+        file_view_layout = QVBoxLayout()
+        file_view_page.setLayout(file_view_layout)
+
+        mode_change = QWidget()
+        mode_change_layout = QHBoxLayout()
+        mode_change.setLayout(mode_change_layout)
+
+        edit_button = QPushButton("Режим редактирования")
+        view_button = QPushButton("Режим просмотра")
+
+        mode_change_layout.addWidget(edit_button)
+        mode_change_layout.addWidget(view_button)
+
+        text = QStackedWidget()
+
+        text_edit_mode = QPlainTextEdit()
+        text_edit_mode.setReadOnly(False)
+        text_edit_mode.setPlainText(file_path.read_text(encoding="utf-8"))
+
+        text_view_mode = QTextBrowser()
+        text_view_mode.setMarkdown(text_edit_mode.toPlainText())
+
+        text.addWidget(text_view_mode)
+        text.addWidget(text_edit_mode)
+        text.setCurrentWidget(text_edit_mode)
+
+        self.right_panel_tab_widget.setCurrentWidget(file_view_page)
+        self.right_panel_tab_widget.setStyleSheet("background-color: white")
+        self.opened_files[file_path] = {"page": file_view_page, "type": "markdown", "editor": text_edit_mode, "modified": False}
+
+        text_edit_mode.textChanged.connect(self._mark_file_modified)
+
+        file_view_layout.addWidget(mode_change, 1)
+        file_view_layout.addWidget(text, 24)
+
+        edit_button.clicked.connect(lambda: text.setCurrentWidget(text_edit_mode))
+        view_button.clicked.connect(lambda: self._show_markdown_preview(text_edit_mode, text_view_mode, text))
+
     def _show_markdown_preview(self, editor, viewer, text_widget):
         viewer.setMarkdown(editor.toPlainText())
         text_widget.setCurrentWidget(viewer)
+
+    def _set_pdf_mode(self, file_path):
+        file_view_page = QWidget()
+        self.right_panel_tab_widget.addTab(file_view_page, file_path.stem)
+
+        file_view_layout = QVBoxLayout()
+        file_view_page.setLayout(file_view_layout)
+
+        file_viewer = self._create_document_wiever(file_path, file_view_page)
+
+        file_view_layout.addWidget(file_viewer)
+
+        self.opened_files[file_path] = {"page": file_view_page, "type": "pdf", "editor": None,
+                                        "modified": False}
+        self.right_panel_tab_widget.setCurrentWidget(file_view_page)
+
+    '''
+    def _set_docx_mode(self, file_path):
+        file_view_page = QWidget()
+        self.right_panel_tab_widget.addTab(file_view_page, file_path.stem)
+        file_view_layout = QVBoxLayout()
+        file_view_page.setLayout(file_view_layout)
+
+        mode_change = QWidget()
+        mode_change_layout = QHBoxLayout()
+        mode_change.setLayout(mode_change_layout)
+
+        view_button = QPushButton("Режим просмотра")
+        edit_button = QPushButton("Режим редактирования")
+
+        mode_change_layout.addWidget(view_button)
+        mode_change_layout.addWidget(edit_button)
+
+        document = QStackedWidget()
+
+
+        document.addWidget(doc_view_mode)
+        document.addWidget(doc_edit_mode)
+        document.setCurrentWidget(doc_edit_mode)
+
+        self.opened_files[file_path] = {"page": file_view_page, "type": "docx", "editor": text_edit_mode,
+                                        "modified": False}
+
+    def _set_odt_mode(self, file_path):
+        file_view_page = QWidget()
+        self.right_panel_tab_widget.addTab(file_view_page, file_path.stem)
+        file_view_layout = QVBoxLayout()
+        file_view_page.setLayout(file_view_layout)
+
+        mode_change = QWidget()
+        mode_change_layout = QHBoxLayout()
+        mode_change.setLayout(mode_change_layout)
+
+        view_button = QPushButton("Режим просмотра")
+        edit_button = QPushButton("Режим редактирования")
+
+        mode_change_layout.addWidget(view_button)
+        mode_change_layout.addWidget(edit_button)
+
+        document = QStackedWidget()
+
+        document.addWidget(doc_view_mode)
+        document.addWidget(doc_edit_mode)
+        document.setCurrentWidget(doc_edit_mode)
+
+        self.opened_files[file_path] = {"page": file_view_page, "type": "odt", "editor": text_edit_mode, "modified": False}
+'''
+
+    def _create_document_wiever(self, file_path, parent):
+        if file_path.suffix.lower() == ".pdf":
+            pdf = QPdfDocument(parent)
+            pdf.load(str(file_path))
+            doc_view_mode = QPdfView()
+            doc_view_mode.setDocument(pdf)
+            doc_view_mode.setPageMode(QPdfView.PageMode.MultiPage)
+            doc_view_mode.setZoomMode(QPdfView.ZoomMode.FitToWidth)
+            return doc_view_mode
+
+
+
+
 
