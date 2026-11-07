@@ -11,7 +11,8 @@ from PySide6.QtWidgets import (
     QTreeView,
     QFileSystemModel,
     QPlainTextEdit,
-    QTabWidget
+    QTabWidget,
+    QMessageBox
 )
 
 from PySide6.QtGui import (
@@ -180,9 +181,20 @@ class MainWindow(QMainWindow):
                 path = key
 
         if path is not None:
-          self.opened_files.pop(path)
-
-        self.right_panel_tab_widget.removeTab(index)
+            if self.opened_files[path]["modified"]:
+                result = self._close_edited_file()
+                if result == "Save":
+                    self._save_file(path)
+                    self.opened_files.pop(path)
+                    self.right_panel_tab_widget.removeTab(index)
+                elif result == "Discard":
+                    self.opened_files.pop(path)
+                    self.right_panel_tab_widget.removeTab(index)
+                else:
+                    return
+            else:
+                self.opened_files.pop(path)
+                self.right_panel_tab_widget.removeTab(index)
 
 
     def _save_current_file(self):
@@ -215,5 +227,40 @@ class MainWindow(QMainWindow):
             self.right_panel_tab_widget.setTabText(current_index, f"{path.stem} *")
             self.opened_files[path]["modified"] = True
 
+    def _save_file(self, path):
+        index = self.right_panel_tab_widget.indexOf(self.opened_files[path]["page"])
 
+        if path is not None:
+            editor = self.opened_files[path]["editor"]
+            path.write_text(editor.toPlainText(), encoding="utf-8")
+            self.opened_files[path]["modified"] = False
+            self.right_panel_tab_widget.setTabText(index, path.stem)
+
+
+
+    def _close_edited_file(self):
+        # 1. Создаем объект диалога
+        close_message = QMessageBox(self)
+        close_message.setWindowTitle("Закрыть вкладку")
+        close_message.setText("Сохранить изменения?")
+
+        # 2. Добавляем кнопки с кастомным текстом
+        # Роль кнопки (ButtonRole) помогает Qt правильно расположить их по стандартам ОС
+        save_button = close_message.addButton("Сохранить", QMessageBox.ButtonRole.AcceptRole)
+        discard_button = close_message.addButton("Не сохранять", QMessageBox.ButtonRole.RejectRole)
+        cancel_button = close_message.addButton("Отмена", QMessageBox.ButtonRole.ResetRole)
+
+        # 3. Устанавливаем кнопку по умолчанию
+        close_message.setDefaultButton(save_button)
+
+        # 4. Показываем окно и проверяем, какая кнопка была нажата
+        close_message.exec()
+
+
+        if close_message.clickedButton() == save_button:
+            return "Save"
+        if close_message.clickedButton() == discard_button:
+            return "Discard"
+        if close_message.clickedButton() == cancel_button:
+            return "Cancel"
 
